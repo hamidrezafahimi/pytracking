@@ -1,4 +1,8 @@
-from ltr.admin.environment import env_settings
+import sys
+from pathlib import Path
+root_path = str(Path(__file__).parent.resolve()) + "/../../.."
+sys.path.append(root_path)
+from pytracking.ltr.admin.environment import env_settings
 
 
 class Settings:

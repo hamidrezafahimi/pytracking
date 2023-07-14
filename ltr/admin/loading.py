@@ -4,7 +4,10 @@ import sys
 from pathlib import Path
 import importlib
 import inspect
-import ltr.admin.settings as ws_settings
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.resolve()) + "/../../..")
+sys.path.append(str(Path(__file__).parent.resolve()) + "/../..")
+import pytracking.ltr.admin.settings as ws_settings
 
 
 def load_trained_network(workspace_dir, network_path, checkpoint=None):
@@ -131,14 +134,14 @@ def torch_load_legacy(path):
 
 
 def _setup_legacy_env():
-    importlib.import_module('ltr')
-    sys.modules['dlframework'] = sys.modules['ltr']
-    sys.modules['dlframework.common'] = sys.modules['ltr']
-    importlib.import_module('ltr.admin')
-    sys.modules['dlframework.common.utils'] = sys.modules['ltr.admin']
+    importlib.import_module('pytracking.ltr')
+    sys.modules['dlframework'] = sys.modules['pytracking.ltr']
+    sys.modules['dlframework.common'] = sys.modules['pytracking.ltr']
+    importlib.import_module('pytracking.ltr.admin')
+    sys.modules['dlframework.common.utils'] = sys.modules['pytracking.ltr.admin']
     for m in ('model_constructor', 'stats', 'settings', 'local'):
-        importlib.import_module('ltr.admin.' + m)
-        sys.modules['dlframework.common.utils.' + m] = sys.modules['ltr.admin.' + m]
+        importlib.import_module('pytracking.ltr.admin.' + m)
+        sys.modules['dlframework.common.utils.' + m] = sys.modules['pytracking.ltr.admin.' + m]
 
 
 def _cleanup_legacy_env():

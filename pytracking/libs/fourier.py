@@ -1,7 +1,11 @@
 import torch
 import torch.nn.functional as F
-from pytracking import complex, TensorList
-from pytracking.libs.tensorlist import tensor_operation
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.resolve()) + "/../../..")
+from pytracking.pytracking import TensorList
+from . import complex
+from pytracking.pytracking.libs.tensorlist import tensor_operation
 
 
 @tensor_operation

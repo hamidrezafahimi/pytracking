@@ -4,7 +4,11 @@ import torch
 import torch.nn.functional as F
 import cv2 as cv
 import random
-from pytracking.features.preprocessing import numpy_to_torch, torch_to_numpy
+import sys
+from pathlib import Path
+root_path = str(Path(__file__).parent.resolve()) + "/../../../.."
+sys.path.append(root_path)
+from pytracking.pytracking.features.preprocessing import numpy_to_torch, torch_to_numpy
 
 
 class Transform:

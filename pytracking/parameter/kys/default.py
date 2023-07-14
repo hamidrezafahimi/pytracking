@@ -1,5 +1,9 @@
-from pytracking.utils import TrackerParams
-from pytracking.features.net_wrappers import NetWithBackbone
+import sys
+from pathlib import Path
+root_path = str(Path(__file__).parent.resolve()) + "/../../../.."
+sys.path.append(root_path)
+from pytracking.pytracking.utils import TrackerParams
+from pytracking.pytracking.features.net_wrappers import NetWithBackbone
 
 
 def parameters():

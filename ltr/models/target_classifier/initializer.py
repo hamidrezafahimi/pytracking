@@ -1,8 +1,14 @@
 import torch.nn as nn
 import torch
 import torch.nn.functional as F
-from ltr.external.PreciseRoIPooling.pytorch.prroi_pool import PrRoIPool2D
-from ltr.models.layers.blocks import conv_block
+import sys
+from pathlib import Path
+root_path = str(Path(__file__).parent.resolve()) + "/../../../.."
+root_root_path = str(Path(__file__).parent.resolve()) + "/../../../../.."
+sys.path.append(root_path)
+sys.path.append(root_root_path)
+from lib.PreciseRoIPooling.pytorch.prroi_pool import PrRoIPool2D
+from pytracking.ltr.models.layers.blocks import conv_block
 import math
 
 

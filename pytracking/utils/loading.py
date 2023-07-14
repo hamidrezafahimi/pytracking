@@ -1,6 +1,10 @@
 import os
-import ltr.admin.loading as ltr_loading
-from pytracking.evaluation.environment import env_settings
+import sys
+from pathlib import Path
+root_path = str(Path(__file__).parent.resolve()) + "/../../.."
+sys.path.append(root_path)
+import pytracking.ltr.admin.loading as ltr_loading
+from pytracking.pytracking.evaluation.environment import env_settings
 
 
 def load_network(net_path, **kwargs):

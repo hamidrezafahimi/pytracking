@@ -1,5 +1,8 @@
 import torch
-from pytracking.libs.tensorlist import tensor_operation
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.resolve()) + "/../../..")
+from pytracking.pytracking.libs.tensorlist import tensor_operation
 
 
 def is_complex(a: torch.Tensor) -> bool:

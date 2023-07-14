@@ -1,4 +1,8 @@
-from pytracking import TensorList
+import sys
+from pathlib import Path
+root_path = str(Path(__file__).parent.resolve()) + "/../../.."
+sys.path.insert(0, root_path + "/trackers")
+from pytracking.pytracking import TensorList
 import random
 
 

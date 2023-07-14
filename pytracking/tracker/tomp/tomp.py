@@ -1,15 +1,17 @@
-from pytracking.tracker.base import BaseTracker
 import torch
 import torch.nn.functional as F
 import math
 import time
-from pytracking import dcf, TensorList
-from pytracking.features.preprocessing import numpy_to_torch
-from pytracking.features.preprocessing import sample_patch_multiscale, sample_patch_transformed
-from pytracking.features import augmentation
-from ltr.models.layers import activation
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.resolve()) + "/../../../..")
+from pytracking.pytracking import dcf, TensorList
+from pytracking.pytracking.tracker.base import BaseTracker
+from pytracking.pytracking.features.preprocessing import numpy_to_torch
+from pytracking.pytracking.features.preprocessing import sample_patch_multiscale, sample_patch_multiloc, sample_patch_transformed
+from pytracking.pytracking.features import augmentation
+from pytracking.ltr.models.layers import activation
 
-import numpy as np
 from collections import defaultdict
 
 
@@ -139,7 +141,7 @@ class ToMP(BaseTracker):
 
         return reg_targets_per_im
 
-    def track(self, image, info: dict = None) -> dict:
+    def track(self, image, FI: list = None, do_learning=True, info: dict = None) -> dict:
         self.debug_info = {}
 
         self.frame_num += 1
@@ -151,9 +153,12 @@ class ToMP(BaseTracker):
         # ------- LOCALIZATION ------- #
 
         # Extract backbone features
-        backbone_feat, sample_coords, im_patches = self.extract_backbone_features(im, self.get_centered_sample_pos(),
-                                                                      self.target_scale * self.params.scale_factors,
-                                                                      self.img_sample_sz)
+        backbone_feat, sample_coords, im_patches = self.extract_backbone_features_multiloc(im, self.get_centered_sample_pos(FI=FI),
+                                                                                           self.target_scale * self.params.scale_factors,
+                                                                                           self.img_sample_sz)
+
+        self._sample_coords = sample_coords.cpu().detach().numpy()
+
         # Extract classification features
         test_x = self.get_backbone_head_feat(backbone_feat)
 
@@ -161,7 +166,15 @@ class ToMP(BaseTracker):
         sample_pos, sample_scales = self.get_sample_location(sample_coords)
 
         # Compute classification scores
-        scores_raw, bbox_preds = self.classify_target(test_x)
+        scores_raw, bbox_preds = [], []
+        for i in range(test_x.size()[0]):
+          new_test_x = test_x[i,:,:,:]
+          new_test_x = new_test_x[None,:,:,:]
+          scores_raw_i, bbox_preds_i = self.classify_target(new_test_x)
+          scores_raw.append(scores_raw_i)
+          bbox_preds.append(bbox_preds_i)
+
+        scores_raw, bbox_preds = torch.cat(scores_raw), torch.cat(bbox_preds)
 
         translation_vec, scale_ind, s, flag, score_loc = self.localize_target(scores_raw, sample_pos, sample_scales)
 
@@ -178,24 +191,35 @@ class ToMP(BaseTracker):
                 self.search_area_rescaling()
 
         # ------- UPDATE ------- #
+        if do_learning:
 
-        update_flag = flag not in ['not_found', 'uncertain']
-        hard_negative = (flag == 'hard_negative')
-        learning_rate = self.params.get('hard_negative_learning_rate', None) if hard_negative else None
+            update_flag = flag not in ['not_found', 'uncertain']
+            hard_negative = (flag == 'hard_negative')
+            learning_rate = self.params.get('hard_negative_learning_rate', None) if hard_negative else None
 
-        if update_flag and self.params.get('update_classifier', False) and scores_raw.max() > self.params.get('conf_ths', 0.0):
-            # Get train sample
-            train_x = test_x[scale_ind:scale_ind+1, ...]
+            if update_flag and self.params.get('update_classifier', False) and scores_raw.max() > self.params.get('conf_ths', 0.0):
+                # Get train sample
+                train_x = test_x[scale_ind:scale_ind+1, ...]
 
-            # Create target_box and label for spatial sample
-            target_box = self.get_iounet_box(self.pos, self.target_sz, sample_pos[scale_ind,:], sample_scales[scale_ind])
-            train_y = self.get_label_function(self.pos, sample_pos[scale_ind, :], sample_scales[scale_ind]).to(
-                self.params.device)
+                # Create target_box and label for spatial sample
+                target_box = self.get_iounet_box(self.pos, self.target_sz, sample_pos[scale_ind,:], sample_scales[scale_ind])
+                train_y = self.get_label_function(self.pos, sample_pos[scale_ind, :], sample_scales[scale_ind]).to(
+                    self.params.device)
 
-            # Update the classifier model
-            self.update_memory(TensorList([train_x]), train_y, target_box, learning_rate)
+                # Update the classifier model
+                self.update_memory(TensorList([train_x]), train_y, target_box, learning_rate)
 
         score_map = s[scale_ind, ...]
+
+        self.score = score_map.cpu().detach().numpy()
+
+        score_sz = torch.Tensor(list(scores_raw.shape[-2:]))
+        output_sz = score_sz - (self.kernel_size + 1) % 2
+        sfactor = (self.img_support_sz / output_sz) * sample_scales[scale_ind]
+        sfactor = sfactor.cpu().detach().numpy()
+        self.crop_size = self.score.shape*sfactor
+        self.crop_size = (int(self.crop_size[0]), int(self.crop_size[1]))
+        self.trans = translation_vec.cpu().detach().numpy()
 
         # Compute output bounding box
         new_state = torch.cat((self.pos[[1, 0]] - (self.target_sz[[1, 0]] - 1) / 2, self.target_sz[[1, 0]]))
@@ -274,10 +298,24 @@ class ToMP(BaseTracker):
         sample_scales = ((sample_coord[:,2:] - sample_coord[:,:2]) / self.img_sample_sz).prod(dim=1).sqrt()
         return sample_pos, sample_scales
 
-    def get_centered_sample_pos(self):
+    def get_centered_sample_pos(self, FI=None):
         """Get the center position for the new sample. Make sure the target is correctly centered."""
-        return self.pos + ((self.feature_sz + self.kernel_size) % 2) * self.target_scale * \
-               self.img_support_sz / (2*self.feature_sz)
+
+        pos = []
+        if FI is None:
+            pos.append(self.pos)
+            pos[-1] += ((self.feature_sz + self.kernel_size) % 2) * self.target_scale * \
+                         self.img_support_sz / (2*self.feature_sz)
+        else:
+            pos.append(self.pos)
+            pos[-1] += ((self.feature_sz + self.kernel_size) % 2) * self.target_scale * \
+                         self.img_support_sz / (2*self.feature_sz)
+
+            pos.append( torch.Tensor([ FI[1]+FI[3]/2, FI[0]+FI[2]/2]) )
+            pos[-1] += ((self.feature_sz + self.kernel_size) % 2) * self.target_scale * \
+                         self.img_support_sz / (2*self.feature_sz)
+
+        return pos
 
     def classify_target(self, sample_x: TensorList):
         """Classify target by applying the DiMP filter."""
@@ -412,6 +450,14 @@ class ToMP(BaseTracker):
 
     def extract_backbone_features(self, im: torch.Tensor, pos: torch.Tensor, scales, sz: torch.Tensor):
         im_patches, patch_coords = sample_patch_multiscale(im, pos, scales, sz,
+                                                           mode=self.params.get('border_mode', 'replicate'),
+                                                           max_scale_change=self.params.get('patch_max_scale_change', None))
+        with torch.no_grad():
+            backbone_feat = self.net.extract_backbone(im_patches)
+        return backbone_feat, patch_coords, im_patches
+
+    def extract_backbone_features_multiloc(self, im: torch.Tensor, poses, scales, sz: torch.Tensor):
+        im_patches, patch_coords = sample_patch_multiloc(im, poses, scales, sz,
                                                            mode=self.params.get('border_mode', 'replicate'),
                                                            max_scale_change=self.params.get('patch_max_scale_change', None))
         with torch.no_grad():

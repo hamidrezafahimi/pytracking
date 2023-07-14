@@ -1,8 +1,11 @@
 import math
 import torch
 import torch.nn as nn
-from pytracking import TensorList
-from ltr.models.layers import activation
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.resolve()) + "/../../../..")
+from pytracking.pytracking import TensorList
+from pytracking.ltr.models.layers import activation
 
 
 class GNSteepestDescent(nn.Module):

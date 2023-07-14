@@ -1,9 +1,11 @@
 import torch
 import math
-from pytracking import fourier
-from pytracking import complex
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.resolve()) + "/../../..")
+from . import fourier 
+from . import complex
 import torch.nn.functional as F
-
 
 def hann1d(sz: int, centered = True) -> torch.Tensor:
     """1D cosine window."""

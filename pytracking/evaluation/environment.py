@@ -1,5 +1,9 @@
 import importlib
 import os
+import sys
+from pathlib import Path
+pth = str(Path(__file__).parent.resolve()) + "/../../.."
+sys.path.insert(2, pth)
 
 
 class EnvSettings:
@@ -36,7 +40,7 @@ def create_default_local_file():
     with open(path, 'w') as f:
         settings = EnvSettings()
 
-        f.write('from pytracking.evaluation.environment import EnvSettings\n\n')
+        f.write('from pytracking.pytracking.evaluation.environment import EnvSettings\n\n')
         f.write('def local_env_settings():\n')
         f.write('    settings = EnvSettings()\n\n')
         f.write('    # Set your local paths here.\n\n')
@@ -55,14 +59,16 @@ def create_default_local_file():
 
 
 def env_settings():
-    env_module_name = 'pytracking.evaluation.local'
-    try:
-        env_module = importlib.import_module(env_module_name)
-        return env_module.local_env_settings()
-    except:
-        env_file = os.path.join(os.path.dirname(__file__), 'local.py')
+    env_module_name = 'pytracking.pytracking.evaluation.local'
+    env_module = importlib.import_module(env_module_name)
+    return env_module.local_env_settings()
+    # try:
+    #     env_module = importlib.import_module(env_module_name)
+    #     return env_module.local_env_settings()
+    # except:
+    #     env_file = os.path.join(os.path.dirname(__file__), 'local.py')
 
-        # Create a default file
-        create_default_local_file()
-        raise RuntimeError('YOU HAVE NOT SETUP YOUR local.py!!!\n Go to "{}" and set all the paths you need. '
-                           'Then try to run again.'.format(env_file))
+    #     # Create a default file
+    #     create_default_local_file()
+    #     raise RuntimeError('YOU HAVE NOT SETUP YOUR local.py!!!\n Go to "{}" and set all the paths you need. '
+    #                        'Then try to run again.'.format(env_file))

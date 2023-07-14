@@ -4,7 +4,10 @@ import math
 import ltr.models.layers.filter as filter_layer
 import ltr.models.layers.activation as activation
 from ltr.models.layers.distance import DistanceMap
-from pytracking import TensorList
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.resolve()) + "/../../../..")
+from pytracking.pytracking import TensorList
 
 
 class LinearFilterLearnGen(nn.Module):
@@ -85,15 +88,11 @@ class LinearFilterLearnGen(nn.Module):
         return TensorList([data_residual, reg_residual])
 
 
-
 class LinearFilterHinge(nn.Module):
-    def __init__(self, feat_stride=16, init_filter_reg=1e-2, hinge_threshold=-999, activation_leak=0.0, score_act='bentpar', act_param=None, learn_filter_reg=True):
+    def __init__(self, feat_stride=16, init_filter_reg=1e-2, hinge_threshold=-999, activation_leak=0.0, score_act='bentpar', act_param=None):
         super().__init__()
 
-        if learn_filter_reg:
-            self.filter_reg = nn.Parameter(init_filter_reg * torch.ones(1))
-        else:
-            self.filter_reg = init_filter_reg
+        self.filter_reg = nn.Parameter(init_filter_reg * torch.ones(1))
         self.feat_stride = feat_stride
         self.hinge_threshold = hinge_threshold
         self.activation_leak = activation_leak
